@@ -105,7 +105,7 @@ async function renameAttachments(event) {
     for (let item of selectedItems) {
         if (!item.isAttachment()) {
             // Set author(s)
-            let authors = item.getCreators().filter(creator => creator.creatorTypeID === 1);
+            let authors = item.getCreators().filter(creator => creator.creatorTypeID === 8);
             let firstAuthor = "n.a.";
             if (authors.length === 1) {
                 firstAuthor = authors[0].lastName;
@@ -122,7 +122,10 @@ async function renameAttachments(event) {
             let st = item.getField("shortTitle");
             let t = item.getField("title");
             let title = st || t || "";
-            title = title
+            if (item.getField("language") == "ja") {
+                title = title;
+            } else {
+                title = title
                 .replace(/[^a-zA-Z0-9 ]/g, "") // remove special characters
                 .replace(/\b(the|a)\b/gi, "")
                 .replace(/\b(, and|and)\b/gi, "&")
@@ -139,10 +142,11 @@ async function renameAttachments(event) {
                 .replace(/\b(identities|identity)\b/gi, "ID")
                 .split(/\s+/)
                 .map((word, index) => {
+                    // return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
                     return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1);
                 })
                 .join("");
-            
+            }
             let fileName = `${firstAuthor} (${year})_${title}.pdf`;
 
             // Rename attachment
