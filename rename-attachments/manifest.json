@@ -1,9 +1,9 @@
 {
 	"manifest_version": 2,
 	"name": "Rename Attachments",
-	"version": "1.0",
+	"version": "1.1",
 	"description": "Rename PDF attachments based on metadata",
-	"author": "Your Name",
+	"author": "Ko Horiuchi",
 	"applications": {
 	  "zotero": {
 		"id": "rename-attachments@zotero.org",
