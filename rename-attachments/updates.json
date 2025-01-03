@@ -1,0 +1,18 @@
+{
+  "addons": {
+    "rename-attachments@zotero.org": {
+      "updates": [
+        {
+          "version": "1.0",
+          "update_link": "https://raw.githubusercontent.com/sailor027/Zotero/e68aa1f14496651b1e38eb389f09d72d8839cd95/rename-attachments/rename-attachments.xpi",
+          "update_hash": "sha256:c9fbc50f6a7dcde6753d9521181fa53ed3f90c96b654153f288bcc7dc88cfcc7",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

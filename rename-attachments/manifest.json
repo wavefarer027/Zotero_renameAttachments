@@ -9,7 +9,7 @@
 		"id": "rename-attachments@zotero.org",
 		"strict_min_version": "6.999",
 		"strict_max_version": "7.0.*",
-		"update_url": "https://sailor027.github.io/rename-attachments/updates.json"
+		"update_url": "https://github.com/sailor027/Zotero/tree/e68aa1f14496651b1e38eb389f09d72d8839cd95/rename-attachments"
 	  }
 	}
   }
