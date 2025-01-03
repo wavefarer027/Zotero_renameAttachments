@@ -2,7 +2,10 @@ var chromeHandle;
 
 function install(data, reason) {}
 
-function startup({ id, version, rootURI }, reason) {
+async function startup({ id, version, rootURI }, reason) {
+    // Wait for Zotero to be ready
+    await Zotero.initializationPromise;
+
     // Register chrome URLs
     var aomStartup = Components.classes["@mozilla.org/addons/addon-manager-startup;1"]
         .getService(Components.interfaces.amIAddonManagerStartup);
@@ -11,9 +14,10 @@ function startup({ id, version, rootURI }, reason) {
         ["content", "rename-attachments", "chrome/content/"]
     ]);
 
-    // Create menu item
-    if (window?.document) {
-        addMenuItem(window);
+    // Add menu item to all windows
+    var windows = Zotero.getMainWindows();
+    for (let win of windows) {
+        addMenuItem(win);
     }
 }
 
@@ -42,26 +46,57 @@ function onMainWindowUnload(win) {
 
 function addMenuItem(window) {
     let doc = window.document;
+    
+    // Create menu item for the item menu
     let menuitem = doc.createXULElement('menuitem');
     menuitem.id = 'rename-attachments-menuitem';
     menuitem.setAttribute('label', 'Rename Attachments');
     menuitem.addEventListener('command', renameAttachments);
     
+    // Add to both the item menu and the context menu
     let itemMenu = doc.getElementById('zotero-itemmenu');
     if (itemMenu) {
-        itemMenu.appendChild(menuitem);
+        let insertAfter = doc.getElementById('zotero-itemmenu-show-in-library');
+        if (insertAfter && insertAfter.nextSibling) {
+            itemMenu.insertBefore(menuitem, insertAfter.nextSibling);
+        } else {
+            itemMenu.appendChild(menuitem);
+        }
+    }
+
+    // Also add to context menu
+    let contextMenu = doc.getElementById('zotero-item-tree-context-menu');
+    if (contextMenu) {
+        let clonedItem = menuitem.cloneNode(true);
+        clonedItem.id = 'rename-attachments-context-menuitem';
+        clonedItem.addEventListener('command', renameAttachments);
+        
+        let insertAfter = doc.getElementById('zotero-item-tree-context-menu-show-in-library');
+        if (insertAfter && insertAfter.nextSibling) {
+            contextMenu.insertBefore(clonedItem, insertAfter.nextSibling);
+        } else {
+            contextMenu.appendChild(clonedItem);
+        }
     }
 }
 
 function removeMenuItem(window) {
     let doc = window.document;
+    
+    // Remove from item menu
     let menuitem = doc.getElementById('rename-attachments-menuitem');
     if (menuitem) {
         menuitem.remove();
     }
+    
+    // Remove from context menu
+    let contextMenuItem = doc.getElementById('rename-attachments-context-menuitem');
+    if (contextMenuItem) {
+        contextMenuItem.remove();
+    }
 }
 
-async function renameAttachments() {
+async function renameAttachments(event) {
     var selectedItems = Zotero.getActiveZoteroPane().getSelectedItems();
     if (!selectedItems.length) {
         return "No items selected.";
@@ -88,7 +123,7 @@ async function renameAttachments() {
             let t = item.getField("title");
             let title = st || t || "";
             title = title
-                .replace(/[^a-zA-Z0-9 ]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, "") // remove special characters
                 .replace(/\b(the|a)\b/gi, "")
                 .replace(/\b(, and|and)\b/gi, "&")
                 .replace(/ing\b/g, "\u0337̲̲")
@@ -118,6 +153,7 @@ async function renameAttachments() {
                     try {
                         await attachment.renameAttachmentFile(fileName);
                         await attachment.saveTx();
+                        Zotero.debug(`Successfully renamed attachment to: ${fileName}`);
                     } catch (e) {
                         Zotero.debug(`Error renaming attachment: ${e}`);
                     }
@@ -125,5 +161,7 @@ async function renameAttachments() {
             }
         }
     }
-    return selectedItems.length + " items processed.";
+    
+    // Show completion message
+    event.target.ownerGlobal.alert(`${selectedItems.length} items processed.`);
 }
