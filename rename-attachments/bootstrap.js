@@ -1,4 +1,5 @@
 var chromeHandle;
+var windowListener;
 
 function install(data, reason) {}
 
@@ -14,14 +15,43 @@ async function startup({ id, version, rootURI }, reason) {
         ["content", "rename-attachments", "chrome/content/"]
     ]);
 
-    // Add menu item to all windows
+    // Add menu item to all existing windows
     var windows = Zotero.getMainWindows();
     for (let win of windows) {
         addMenuItem(win);
     }
+    
+    // Register listener for new windows
+    windowListener = {
+        onOpenWindow: function(xulWindow) {
+            let domWindow = xulWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+                .getInterface(Components.interfaces.nsIDOMWindowInternal || Components.interfaces.nsIDOMWindow);
+            
+            domWindow.addEventListener("load", function listener() {
+                domWindow.removeEventListener("load", listener, false);
+                
+                // Check if this is a Zotero window
+                if (domWindow.Zotero && domWindow.Zotero.getActiveZoteroPane) {
+                    addMenuItem(domWindow);
+                }
+            }, false);
+        },
+        onCloseWindow: function(xulWindow) {},
+        onWindowTitleChange: function(xulWindow, newTitle) {}
+    };
+    
+    // Add the window listener
+    Services.wm.addListener(windowListener);
 }
 
 function shutdown(data, reason) {
+    // Remove window listener
+    if (windowListener) {
+        Services.wm.removeListener(windowListener);
+        windowListener = null;
+    }
+    
+    // Remove chrome handle
     if (chromeHandle) {
         chromeHandle.destruct();
         chromeHandle = null;
@@ -35,14 +65,6 @@ function shutdown(data, reason) {
 }
 
 function uninstall(data, reason) {}
-
-function onMainWindowLoad(win) {
-    addMenuItem(win);
-}
-
-function onMainWindowUnload(win) {
-    removeMenuItem(win);
-}
 
 function addMenuItem(window) {
     let doc = window.document;
@@ -105,7 +127,7 @@ async function renameAttachments(event) {
     for (let item of selectedItems) {
         if (!item.isAttachment()) {
             // Set author(s)
-            let authors = item.getCreators().filter(creator => creator.creatorTypeID === 8);
+            let authors = item.getCreators().filter(creator => creator.creatorTypeID === 1);
             let firstAuthor = "n.a.";
             if (authors.length === 1) {
                 firstAuthor = authors[0].lastName;
@@ -122,10 +144,7 @@ async function renameAttachments(event) {
             let st = item.getField("shortTitle");
             let t = item.getField("title");
             let title = st || t || "";
-            if (item.getField("language") == "ja") {
-                title = title;
-            } else {
-                title = title
+            title = title
                 .replace(/[^a-zA-Z0-9 ]/g, "") // remove special characters
                 .replace(/\b(the|a)\b/gi, "")
                 .replace(/\b(, and|and)\b/gi, "&")
@@ -142,11 +161,10 @@ async function renameAttachments(event) {
                 .replace(/\b(identities|identity)\b/gi, "ID")
                 .split(/\s+/)
                 .map((word, index) => {
-                    // return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
                     return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1);
                 })
                 .join("");
-            }
+            
             let fileName = `${firstAuthor} (${year})_${title}.pdf`;
 
             // Rename attachment
