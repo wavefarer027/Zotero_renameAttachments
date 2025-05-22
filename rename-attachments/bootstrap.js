@@ -12,7 +12,7 @@ async function startup({ id, version, rootURI }, reason) {
         .getService(Components.interfaces.amIAddonManagerStartup);
     var manifestURI = Services.io.newURI(rootURI + "manifest.json");
     chromeHandle = aomStartup.registerChrome(manifestURI, [
-        ["content", "rename-attachments", "chrome/content/"]
+        ["content", "rename-attachments-plus", "chrome/content/"]
     ]);
 
     // Add menu item to all existing windows
@@ -71,7 +71,7 @@ function addMenuItem(window) {
     
     // Create menu item for the item menu
     let menuitem = doc.createXULElement('menuitem');
-    menuitem.id = 'rename-attachments-menuitem';
+    menuitem.id = 'rename-attachments-plus-menuitem';
     menuitem.setAttribute('label', 'Rename Attachments');
     menuitem.addEventListener('command', renameAttachments);
     
@@ -90,7 +90,7 @@ function addMenuItem(window) {
     let contextMenu = doc.getElementById('zotero-item-tree-context-menu');
     if (contextMenu) {
         let clonedItem = menuitem.cloneNode(true);
-        clonedItem.id = 'rename-attachments-context-menuitem';
+        clonedItem.id = 'rename-attachments-plus-context-menuitem';
         clonedItem.addEventListener('command', renameAttachments);
         
         let insertAfter = doc.getElementById('zotero-item-tree-context-menu-show-in-library');
@@ -106,84 +106,150 @@ function removeMenuItem(window) {
     let doc = window.document;
     
     // Remove from item menu
-    let menuitem = doc.getElementById('rename-attachments-menuitem');
+    let menuitem = doc.getElementById('rename-attachments-plus-menuitem');
     if (menuitem) {
         menuitem.remove();
     }
     
     // Remove from context menu
-    let contextMenuItem = doc.getElementById('rename-attachments-context-menuitem');
+    let contextMenuItem = doc.getElementById('rename-attachments-plus-context-menuitem');
     if (contextMenuItem) {
         contextMenuItem.remove();
+    }
+}
+
+function formatTitle(title, language = '') {
+    if (!title) return '';
+    
+    // For Japanese or other non-Latin scripts, return as-is
+    if (language === 'ja' || language === 'zh' || language === 'ko') {
+        return title.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+    }
+    
+    // English and other Latin-script processing
+    return title
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+        .replace(/\b(the|a|an)\b/gi, '') // Remove articles
+        .replace(/\b(and|or)\b/gi, '&') // Replace conjunctions
+        .replace(/\bbetween\b/gi, 'btwn')
+        .replace(/\bversus\b/gi, 'vs')
+        .replace(/\btransgender\b/gi, 'trans')
+        .replace(/\bsuicidal?\s+(ideation|thoughts?)\b/gi, 'SI')
+        .replace(/\bsuicide\s+prevention\b/gi, 'SP')
+        .replace(/\bmental\s+health\b/gi, 'MH')
+        .replace(/\bpost[\s-]?traumatic\s+stress\s+disorder\b/gi, 'PTSD')
+        .replace(/\bunited\s+states\b/gi, 'US')
+        .replace(/\b(identities|identity)\b/gi, 'ID')
+        .replace(/\s+/g, ' ') // Normalise whitespace
+        .trim()
+        .split(/\s+/)
+        .map((word, index) => {
+            if (word.length === 0) return '';
+            return index === 0 
+                ? word.toLowerCase() 
+                : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .filter(word => word.length > 0)
+        .join('');
+}
+
+function formatAuthors(creators) {
+    // Filter for authors (creatorTypeID 1 = author)
+    let authors = creators.filter(creator => creator.creatorTypeID === 1);
+    
+    if (authors.length === 0) {
+        return 'n.a.';
+    } else if (authors.length === 1) {
+        return authors[0].lastName || authors[0].name || 'Unknown';
+    } else if (authors.length === 2) {
+        return `${authors[0].lastName || authors[0].name} & ${authors[1].lastName || authors[1].name}`;
+    } else {
+        return `${authors[0].lastName || authors[0].name} et al.`;
     }
 }
 
 async function renameAttachments(event) {
     var selectedItems = Zotero.getActiveZoteroPane().getSelectedItems();
     if (!selectedItems.length) {
-        return "No items selected.";
+        event.target.ownerGlobal.alert('No items selected.');
+        return;
     }
 
+    let processedCount = 0;
+    let errorCount = 0;
+    let errors = [];
+
     for (let item of selectedItems) {
-        if (!item.isAttachment()) {
-            // Set author(s)
-            let authors = item.getCreators().filter(creator => creator.creatorTypeID === 1);
-            let firstAuthor = "n.a.";
-            if (authors.length === 1) {
-                firstAuthor = authors[0].lastName;
-            } else if (authors.length === 2) {
-                firstAuthor = `${authors[0].lastName} & ${authors[1].lastName}`;
-            } else if (authors.length > 2) {
-                firstAuthor = `${authors[0].lastName} et al.`;
+        try {
+            if (item.isAttachment()) {
+                continue; // Skip if the selected item is itself an attachment
+            }
+
+            // Get bibliographic data
+            let authors = formatAuthors(item.getCreators());
+            let year = item.getField('date') || item.getField('year') || 'n.d.';
+            
+            // Extract year from date if it's a full date
+            if (year && year.length > 4) {
+                let match = year.match(/(\d{4})/);
+                if (match) {
+                    year = match[1];
+                }
             }
             
-            // Set year
-            let year = item.getField("year") || "n.d.";
+            // Get title
+            let shortTitle = item.getField('shortTitle');
+            let fullTitle = item.getField('title');
+            let title = shortTitle || fullTitle || '';
+            let language = item.getField('language') || '';
             
-            // Set title
-            let st = item.getField("shortTitle");
-            let t = item.getField("title");
-            let title = st || t || "";
-            title = title
-                .replace(/[^a-zA-Z0-9 ]/g, "") // remove special characters
-                .replace(/\b(the|a)\b/gi, "")
-                .replace(/\b(, and|and)\b/gi, "&")
-                .replace(/ing\b/g, "\u0337̲̲")
-                .replace(/ed\b/g, "\u0332̲̲")
-                .replace(/\bbetween\b/gi, "btwn")
-                .replace(/\bversus\b/gi, "vs")
-                .replace(/\btransgender\b/gi, "trans")
-                .replace(/\b(suicidal|suicide) (ideation|thoughts|thought)/gi, "SI")
-                .replace(/\bsuicide prevention/gi, "SP")
-                .replace(/\bmental health/gi, "MH")
-                .replace(/\bposttraumatic stress disorder/gi, "PTSD")
-                .replace(/\bunited states/gi, "US")
-                .replace(/\b(identities|identity)\b/gi, "ID")
-                .split(/\s+/)
-                .map((word, index) => {
-                    return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1);
-                })
-                .join("");
+            let formattedTitle = formatTitle(title, language);
+            let fileName = `${authors} (${year})_${formattedTitle}.pdf`;
             
-            let fileName = `${firstAuthor} (${year})_${title}.pdf`;
-
-            // Rename attachment
+            // Clean up filename to ensure it's valid
+            fileName = fileName.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim();
+            
+            // Rename attachments
             let attachmentIDs = item.getAttachments();
+            let renamedCount = 0;
+            
             for (let id of attachmentIDs) {
                 let attachment = Zotero.Items.get(id);
-                if (attachment.attachmentContentType == 'application/pdf') {
+                if (attachment && attachment.attachmentContentType === 'application/pdf') {
                     try {
                         await attachment.renameAttachmentFile(fileName);
                         await attachment.saveTx();
+                        renamedCount++;
                         Zotero.debug(`Successfully renamed attachment to: ${fileName}`);
                     } catch (e) {
-                        Zotero.debug(`Error renaming attachment: ${e}`);
+                        Zotero.debug(`Error renaming attachment for item "${item.getField('title')}": ${e}`);
+                        errors.push(`${item.getField('title')}: ${e.message}`);
+                        errorCount++;
                     }
                 }
             }
+            
+            if (renamedCount > 0) {
+                processedCount++;
+            }
+            
+        } catch (e) {
+            Zotero.debug(`Error processing item "${item.getField('title')}": ${e}`);
+            errors.push(`${item.getField('title')}: ${e.message}`);
+            errorCount++;
         }
     }
     
     // Show completion message
-    event.target.ownerGlobal.alert(`${selectedItems.length} items processed.`);
+    let message = `Processed ${processedCount} items successfully.`;
+    if (errorCount > 0) {
+        message += `\n${errorCount} errors occurred.`;
+        if (errors.length <= 5) {
+            message += '\n\nErrors:\n' + errors.join('\n');
+        } else {
+            message += '\n\nFirst 5 errors:\n' + errors.slice(0, 5).join('\n') + '\n...';
+        }
+    }
+    
+    event.target.ownerGlobal.alert(message);
 }
