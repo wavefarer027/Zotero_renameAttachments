@@ -1,14 +1,14 @@
 {
 	"manifest_version": 2,
 	"name": "Rename Attachments",
-	"version": "1.1.0",
+	"version": "2.0.0",
 	"description": "Rename PDF attachments based on metadata",
 	"author": "Ko Horiuchi",
 	"applications": {
 	  "zotero": {
 		"id": "rename-attachments@zotero.org",
 		"strict_min_version": "7.0.0",
-		"strict_max_version": "7.1.*",
+		"strict_max_version": "7.*",
 		"update_url": "https://raw.githubusercontent.com/sailor027/Zotero/main/rename-attachments/updates.json"
 	  }
 	}
