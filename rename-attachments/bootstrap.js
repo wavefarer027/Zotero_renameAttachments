@@ -12,7 +12,7 @@ async function startup({ id, version, rootURI }, reason) {
         .getService(Components.interfaces.amIAddonManagerStartup);
     var manifestURI = Services.io.newURI(rootURI + "manifest.json");
     chromeHandle = aomStartup.registerChrome(manifestURI, [
-        ["content", "rename-attachments-plus", "chrome/content/"]
+        ["content", "rename-attachments", "chrome/content/"]
     ]);
 
     // Add menu item to all existing windows
@@ -71,7 +71,7 @@ function addMenuItem(window) {
     
     // Create menu item for the item menu
     let menuitem = doc.createXULElement('menuitem');
-    menuitem.id = 'rename-attachments-plus-menuitem';
+    menuitem.id = 'rename-attachments-menuitem';
     menuitem.setAttribute('label', 'Rename Attachments');
     menuitem.addEventListener('command', renameAttachments);
     
@@ -90,7 +90,7 @@ function addMenuItem(window) {
     let contextMenu = doc.getElementById('zotero-item-tree-context-menu');
     if (contextMenu) {
         let clonedItem = menuitem.cloneNode(true);
-        clonedItem.id = 'rename-attachments-plus-context-menuitem';
+        clonedItem.id = 'rename-attachments-context-menuitem';
         clonedItem.addEventListener('command', renameAttachments);
         
         let insertAfter = doc.getElementById('zotero-item-tree-context-menu-show-in-library');
@@ -106,13 +106,13 @@ function removeMenuItem(window) {
     let doc = window.document;
     
     // Remove from item menu
-    let menuitem = doc.getElementById('rename-attachments-plus-menuitem');
+    let menuitem = doc.getElementById('rename-attachments-menuitem');
     if (menuitem) {
         menuitem.remove();
     }
     
     // Remove from context menu
-    let contextMenuItem = doc.getElementById('rename-attachments-plus-context-menuitem');
+    let contextMenuItem = doc.getElementById('rename-attachments-context-menuitem');
     if (contextMenuItem) {
         contextMenuItem.remove();
     }

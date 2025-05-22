@@ -1,11 +1,11 @@
-if (!Zotero.RenameAttachmentsPlus) {
-    Zotero.RenameAttachmentsPlus = {};
+if (!Zotero.RenameAttachments) {
+    Zotero.RenameAttachments = {};
 }
 
 /**
  * Configuration object for filename formatting
  */
-Zotero.RenameAttachmentsPlus.config = {
+Zotero.RenameAttachments.config = {
     // Default format: Author (Year)_Title.pdf
     format: '{authors} ({year})_{title}.pdf',
     
@@ -29,7 +29,7 @@ Zotero.RenameAttachmentsPlus.config = {
 /**
  * Format title according to rules
  */
-Zotero.RenameAttachmentsPlus.formatTitle = function(title, language = '') {
+Zotero.RenameAttachments.formatTitle = function(title, language = '') {
     if (!title) return '';
     
     // For CJK languages, minimal processing
@@ -65,7 +65,7 @@ Zotero.RenameAttachmentsPlus.formatTitle = function(title, language = '') {
 /**
  * Format authors for filename
  */
-Zotero.RenameAttachmentsPlus.formatAuthors = function(creators) {
+Zotero.RenameAttachments.formatAuthors = function(creators) {
     let authors = creators.filter(creator => creator.creatorTypeID === 1); // Author type
     
     if (authors.length === 0) {
@@ -85,7 +85,7 @@ Zotero.RenameAttachmentsPlus.formatAuthors = function(creators) {
 /**
  * Extract year from date field
  */
-Zotero.RenameAttachmentsPlus.extractYear = function(dateString) {
+Zotero.RenameAttachments.extractYear = function(dateString) {
     if (!dateString) return 'n.d.';
     
     // If it's already just a year
@@ -101,7 +101,7 @@ Zotero.RenameAttachmentsPlus.extractYear = function(dateString) {
 /**
  * Generate filename for an item
  */
-Zotero.RenameAttachmentsPlus.generateFilename = function(item) {
+Zotero.RenameAttachments.generateFilename = function(item) {
     let authors = this.formatAuthors(item.getCreators());
     let year = this.extractYear(item.getField('date') || item.getField('year'));
     let shortTitle = item.getField('shortTitle');
@@ -123,7 +123,7 @@ Zotero.RenameAttachmentsPlus.generateFilename = function(item) {
 /**
  * Main rename function
  */
-Zotero.RenameAttachmentsPlus.rename = async function(items = null) {
+Zotero.RenameAttachments.rename = async function(items = null) {
     let selectedItems = items || Zotero.getActiveZoteroPane().getSelectedItems();
     
     if (!selectedItems.length) {
@@ -188,7 +188,7 @@ Zotero.RenameAttachmentsPlus.rename = async function(items = null) {
 /**
  * Convenience function for batch renaming with progress
  */
-Zotero.RenameAttachmentsPlus.batchRename = async function(items, progressCallback = null) {
+Zotero.RenameAttachments.batchRename = async function(items, progressCallback = null) {
     if (!items || !items.length) {
         return { success: false, message: "No items provided." };
     }
