@@ -6,7 +6,7 @@ if (!Zotero.RenameAttachments) {
  * Configuration object for filename formatting
  */
 Zotero.RenameAttachments.config = {
-    // Default format: Author (Year)_Title.pdf
+    // Default format: Author (Year)_ProcessedTitle.pdf
     format: '{authors} ({year})_{title}.pdf',
     
     // Text replacements for title processing
@@ -23,6 +23,11 @@ Zotero.RenameAttachments.config = {
         'united states': 'US',
         'identities': 'ID',
         'identity': 'ID'
+    },
+    
+    // Special patterns (applied before word splitting)
+    patterns: {
+        'ing\\b': '~'  // Replace -ing endings with ~
     }
 };
 
@@ -48,6 +53,12 @@ Zotero.RenameAttachments.formatTitle = function(title, language = '') {
         formatted = formatted.replace(regex, replacement);
     }
     
+    // Apply pattern replacements (like -ing → ~)
+    for (let [pattern, replacement] of Object.entries(this.config.patterns)) {
+        let regex = new RegExp(pattern, 'g');
+        formatted = formatted.replace(regex, replacement);
+    }
+    
     return formatted
         .replace(/\s+/g, ' ') // Normalise whitespace
         .trim()
@@ -66,17 +77,14 @@ Zotero.RenameAttachments.formatTitle = function(title, language = '') {
  * Format authors for filename
  */
 Zotero.RenameAttachments.formatAuthors = function(creators) {
-    let authors = creators.filter(creator => creator.creatorTypeID === 1); // Author type
+    let authors = creators.filter(creator => creator.creatorTypeID === 8); // Author type (your system uses 8)
     
     if (authors.length === 0) {
         return 'n.a.';
     } else if (authors.length === 1) {
         return authors[0].lastName || authors[0].name || 'Unknown';
-    } else if (authors.length === 2) {
-        let first = authors[0].lastName || authors[0].name || 'Unknown';
-        let second = authors[1].lastName || authors[1].name || 'Unknown';
-        return `${first} & ${second}`;
     } else {
+        // For multiple authors, always use "FirstAuthor et al."
         let first = authors[0].lastName || authors[0].name || 'Unknown';
         return `${first} et al.`;
     }
@@ -104,11 +112,21 @@ Zotero.RenameAttachments.extractYear = function(dateString) {
 Zotero.RenameAttachments.generateFilename = function(item) {
     let authors = this.formatAuthors(item.getCreators());
     let year = this.extractYear(item.getField('date') || item.getField('year'));
+    
+    // Priority: Short Title first, then Title
     let shortTitle = item.getField('shortTitle');
     let fullTitle = item.getField('title');
-    let title = shortTitle || fullTitle || 'untitled';
-    let language = item.getField('language') || '';
     
+    let title;
+    if (shortTitle && shortTitle.trim()) {
+        title = shortTitle;
+        Zotero.debug(`Using Short Title: "${title}"`);
+    } else {
+        title = fullTitle || 'untitled';
+        Zotero.debug(`Using Title: "${title}"`);
+    }
+    
+    let language = item.getField('language') || '';
     let formattedTitle = this.formatTitle(title, language);
     let filename = `${authors} (${year})_${formattedTitle}.pdf`;
     
@@ -152,6 +170,8 @@ Zotero.RenameAttachments.rename = async function(items = null) {
                 if (attachment && attachment.attachmentContentType === 'application/pdf') {
                     try {
                         await attachment.renameAttachmentFile(filename);
+                        // Set attachment title to "PDF"
+                        attachment.setField('title', 'PDF');
                         await attachment.saveTx();
                         itemProcessed = true;
                         Zotero.debug(`Renamed attachment: ${filename}`);
@@ -219,6 +239,8 @@ Zotero.RenameAttachments.batchRename = async function(items, progressCallback = 
                     if (attachment && attachment.attachmentContentType === 'application/pdf') {
                         try {
                             await attachment.renameAttachmentFile(filename);
+                            // Set attachment title to "PDF"
+                            attachment.setField('title', 'PDF');
                             await attachment.saveTx();
                             itemProcessed = true;
                         } catch (e) {

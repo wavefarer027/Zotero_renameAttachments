@@ -7,14 +7,6 @@ async function startup({ id, version, rootURI }, reason) {
     // Wait for Zotero to be ready
     await Zotero.initializationPromise;
 
-    // Register chrome URLs
-    var aomStartup = Components.classes["@mozilla.org/addons/addon-manager-startup;1"]
-        .getService(Components.interfaces.amIAddonManagerStartup);
-    var manifestURI = Services.io.newURI(rootURI + "manifest.json");
-    chromeHandle = aomStartup.registerChrome(manifestURI, [
-        ["content", "rename-attachments", "chrome/content/"]
-    ]);
-
     // Add menu item to all existing windows
     var windows = Zotero.getMainWindows();
     for (let win of windows) {
@@ -49,12 +41,6 @@ function shutdown(data, reason) {
     if (windowListener) {
         Services.wm.removeListener(windowListener);
         windowListener = null;
-    }
-    
-    // Remove chrome handle
-    if (chromeHandle) {
-        chromeHandle.destruct();
-        chromeHandle = null;
     }
     
     // Remove menu items from all windows
@@ -121,9 +107,9 @@ function removeMenuItem(window) {
 function formatTitle(title, language = '') {
     if (!title) return '';
     
-    // For Japanese or other non-Latin scripts, return as-is
+    // For Japanese or other non-Latin scripts, minimal processing
     if (language === 'ja' || language === 'zh' || language === 'ko') {
-        return title.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        return title.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '').trim();
     }
     
     // English and other Latin-script processing
@@ -154,26 +140,30 @@ function formatTitle(title, language = '') {
 }
 
 function formatAuthors(creators) {
-    // Filter for authors (creatorTypeID 1 = author)
-    let authors = creators.filter(creator => creator.creatorTypeID === 1);
+    // Filter for authors (creatorTypeID 8 = author in your system)
+    let authors = creators.filter(creator => creator.creatorTypeID === 8);
     
     if (authors.length === 0) {
         return 'n.a.';
     } else if (authors.length === 1) {
         return authors[0].lastName || authors[0].name || 'Unknown';
-    } else if (authors.length === 2) {
-        return `${authors[0].lastName || authors[0].name} & ${authors[1].lastName || authors[1].name}`;
     } else {
-        return `${authors[0].lastName || authors[0].name} et al.`;
+        // For multiple authors, always use "FirstAuthor et al."
+        let firstAuthor = authors[0].lastName || authors[0].name || 'Unknown';
+        return `${firstAuthor} et al.`;
     }
 }
 
 async function renameAttachments(event) {
+    Zotero.debug("Rename attachments function called"); // Debug log
+    
     var selectedItems = Zotero.getActiveZoteroPane().getSelectedItems();
     if (!selectedItems.length) {
-        event.target.ownerGlobal.alert('No items selected.');
+        alert('No items selected.');
         return;
     }
+
+    Zotero.debug(`Processing ${selectedItems.length} items`); // Debug log
 
     let processedCount = 0;
     let errorCount = 0;
@@ -181,12 +171,18 @@ async function renameAttachments(event) {
 
     for (let item of selectedItems) {
         try {
+            Zotero.debug(`Processing item: ${item.getField('title')}`); // Debug log
+            
             if (item.isAttachment()) {
+                Zotero.debug("Skipping attachment item"); // Debug log
                 continue; // Skip if the selected item is itself an attachment
             }
 
             // Get bibliographic data
-            let authors = formatAuthors(item.getCreators());
+            let creators = item.getCreators();
+            Zotero.debug("Creators: " + JSON.stringify(creators)); // Debug log
+            
+            let authors = formatAuthors(creators);
             let year = item.getField('date') || item.getField('year') || 'n.d.';
             
             // Extract year from date if it's a full date
@@ -197,32 +193,79 @@ async function renameAttachments(event) {
                 }
             }
             
-            // Get title
+            // Get and process the title for filename
             let shortTitle = item.getField('shortTitle');
             let fullTitle = item.getField('title');
-            let title = shortTitle || fullTitle || '';
-            let language = item.getField('language') || '';
             
+            let title, titleSource;
+            if (shortTitle && shortTitle.trim()) {
+                title = shortTitle;
+                titleSource = "Short Title";
+            } else {
+                title = fullTitle || '';
+                titleSource = "Title";
+            }
+            
+            Zotero.debug(`Using ${titleSource}: "${title}"`);
+            
+            let language = item.getField('language') || '';
             let formattedTitle = formatTitle(title, language);
             let fileName = `${authors} (${year})_${formattedTitle}.pdf`;
             
             // Clean up filename to ensure it's valid
             fileName = fileName.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim();
             
+            Zotero.debug(`Generated filename: ${fileName}`); // Debug log
+            
             // Rename attachments
             let attachmentIDs = item.getAttachments();
+            Zotero.debug(`Found ${attachmentIDs.length} attachments`); // Debug log
+            
             let renamedCount = 0;
             
             for (let id of attachmentIDs) {
                 let attachment = Zotero.Items.get(id);
+                Zotero.debug(`Attachment content type: ${attachment.attachmentContentType}`); // Debug log
+                
                 if (attachment && attachment.attachmentContentType === 'application/pdf') {
                     try {
-                        await attachment.renameAttachmentFile(fileName);
+                        // Get current filename for comparison
+                        let currentFilename = attachment.attachmentFilename;
+                        Zotero.debug(`Current filename: ${currentFilename}`);
+                        Zotero.debug(`New filename: ${fileName}`);
+                        
+                        // Check if filenames are the same
+                        if (currentFilename === fileName) {
+                            Zotero.debug("Filenames are identical - no rename needed");
+                            renamedCount++; // Still count as processed
+                            continue;
+                        }
+                        
+                        Zotero.debug(`Attempting to rename attachment ${id} from "${currentFilename}" to "${fileName}"`);
+                        
+                        // Try the rename
+                        let result = await attachment.renameAttachmentFile(fileName);
+                        Zotero.debug(`Rename result: ${result}`);
+                        
+                        // Set attachment title to "PDF"
+                        attachment.setField('title', 'PDF');
+                        
                         await attachment.saveTx();
                         renamedCount++;
-                        Zotero.debug(`Successfully renamed attachment to: ${fileName}`);
+                        
+                        // Verify the rename worked
+                        let newFilename = attachment.attachmentFilename;
+                        Zotero.debug(`After rename, filename is now: ${newFilename}`);
+                        
+                        if (newFilename === fileName) {
+                            Zotero.debug(`✓ Successfully renamed attachment to: ${fileName}`);
+                        } else {
+                            Zotero.debug(`⚠ Warning: Expected ${fileName} but got ${newFilename}`);
+                        }
+                        
                     } catch (e) {
                         Zotero.debug(`Error renaming attachment for item "${item.getField('title')}": ${e}`);
+                        Zotero.debug("Full error: " + e.toString());
                         errors.push(`${item.getField('title')}: ${e.message}`);
                         errorCount++;
                     }
@@ -251,5 +294,5 @@ async function renameAttachments(event) {
         }
     }
     
-    event.target.ownerGlobal.alert(message);
+    alert(message);
 }

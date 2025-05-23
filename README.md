@@ -1,16 +1,17 @@
 # Rename Attachments - Zotero Plugin
 
-An enhanced Zotero plugin that intelligently renames PDF attachments based on bibliographic metadata with improved error handling and customisation options.
+A Zotero plugin that renames PDF attachments with smart title processing while standardising the attachment title field to "PDF".
 
 ## Features
 
-- **Smart filename generation**: Creates filenames in the format `Author (Year)_Title.pdf`
-- **Multiple author handling**: Handles single authors, two authors (`Author1 & Author2`), and multiple authors (`FirstAuthor et al.`)
-- **Title processing**: Intelligently processes titles with common academic abbreviations
-- **Language support**: Special handling for Japanese, Chinese, and Korean titles
-- **Error handling**: Comprehensive error reporting and handling
-- **Batch processing**: Process multiple items with progress tracking
-- **Customisable**: Easy to modify text replacements and formatting rules
+- **Smart filename generation**: `Author (Year)_ProcessedTitle.pdf` with intelligent title abbreviations
+- **Title prioritisation**: Uses Short Title if available, otherwise uses Title field
+- **Standardised attachment titles**: All attachment Title fields set to "PDF" in Zotero
+- **Multiple author handling**: Single authors use last name, multiple authors use "FirstAuthor et al."
+- **Intelligent title processing**: Converts long titles to concise, readable formats
+- **Academic abbreviations**: Common terms automatically shortened (e.g., "mental health" → "MH")
+- **Error handling**: Comprehensive error reporting
+- **Batch processing**: Process multiple items at once
 
 ## Installation
 
@@ -25,11 +26,14 @@ An enhanced Zotero plugin that intelligently renames PDF attachments based on bi
            └── rename.js
    ```
 3. Package as a `.xpi` file or install directly in Zotero 7's developer mode
+   ```
+   zip -r ../rename-attachments-2.0.0.xpi *
+   ```
 
 ## Usage
 
 ### Basic Usage
-1. Select one or more items in your Zotero library
+1. Select one or more items in your Zotero library (not the attachments themselves)
 2. Right-click and choose "Rename Attachments" from the context menu
 3. Or use the menu item from the main item menu
 
@@ -50,18 +54,41 @@ let result = await Zotero.RenameAttachments.batchRename(items,
 let filename = Zotero.RenameAttachments.generateFilename(item);
 ```
 
+## What It Does
+
+### Filename Processing
+The plugin intelligently chooses which title to process:
+
+1. **First Priority**: Uses **Short Title** field if it exists and is not empty
+2. **Fallback**: Uses **Title** field if no Short Title is available
+
+Then applies smart abbreviations to whichever title is selected.
+
+**Example with Short Title**:
+- **Title**: "Self-Triggering? An Exploration of Individuals Who Seek Reminders of Trauma"
+- **Short Title**: "Self-Triggering Study"  
+- **Processed filename**: `Bellet et al. (2020)_selfTrigger~Study.pdf`
+
+**Example without Short Title**:
+- **Title**: "Self-Triggering? An Exploration of Individuals Who Seek Reminders of Trauma"
+- **Short Title**: *(empty)*
+- **Processed filename**: `Bellet et al. (2020)_selfTrigger~explorationIndividualsSeekRemindersTrauma.pdf`
+
+### Zotero Title Field
+After renaming, the attachment's Title field in Zotero shows simply: **"PDF"**
+
+This gives you:
+- **Clean Zotero interface**: All attachments show as "PDF" 
+- **Descriptive filenames**: Actual files have meaningful names
+
 ## Filename Format
 
-The plugin generates filenames using this pattern:
 - **Single author**: `Smith (2023)_studyTitle.pdf`
-- **Two authors**: `Smith & Jones (2023)_studyTitle.pdf`  
-- **Multiple authors**: `Smith et al. (2023)_studyTitle.pdf`
+- **Multiple authors**: `Smith et al. (2023)_studyTitle.pdf`  
 - **No author**: `n.a. (2023)_studyTitle.pdf`
 - **No year**: `Smith (n.d.)_studyTitle.pdf`
 
 ## Title Processing Rules
-
-The plugin applies several transformations to create clean, readable filenames:
 
 ### Common Abbreviations
 - "between" → "btwn"
@@ -73,6 +100,7 @@ The plugin applies several transformations to create clean, readable filenames:
 - "posttraumatic stress disorder" → "PTSD"
 - "united states" → "US"
 - "identity/identities" → "ID"
+- Words ending in "-ing" → "~" (e.g., "triggering" → "trigger~")
 
 ### Text Processing
 - Removes special characters and punctuation
@@ -83,11 +111,10 @@ The plugin applies several transformations to create clean, readable filenames:
 
 ## Customisation
 
-You can modify the text replacements by editing the `config` object in `chrome/content/rename.js`:
+You can modify the abbreviations by editing the `config` object in `chrome/content/rename.js`:
 
 ```javascript
 Zotero.RenameAttachments.config = {
-    format: '{authors} ({year})_{title}.pdf',
     replacements: {
         'your term': 'abbreviation',
         // Add your custom replacements here
@@ -95,19 +122,13 @@ Zotero.RenameAttachments.config = {
 };
 ```
 
-## Improvements Over Original
+## Examples
 
-This enhanced version includes:
-
-1. **Fixed creator type bug**: Correctly identifies authors (creatorTypeID 1)
-2. **Better error handling**: Comprehensive error reporting and recovery
-3. **Improved text processing**: Cleaner, more reliable title formatting
-4. **Language support**: Proper handling of non-Latin scripts
-5. **Code organisation**: Modular, maintainable code structure
-6. **Batch processing**: Support for processing large numbers of items
-7. **Progress tracking**: Optional progress callbacks for batch operations
-8. **Filename validation**: Ensures generated filenames are valid across operating systems
-9. **Flexible API**: Programmatic access for advanced users
+| Original Title | Short Title | Processed Filename | Zotero Title Field |
+|---------------|-------------|-------------------|-------------------|
+| "Mental Health and Suicide Prevention in Transgender Youth" | "MH & SP in Trans Youth" | `Smith et al. (2023)_MHSPtransYouth.pdf` | PDF |
+| "A Study Between PTSD and Identity Formation" | *(empty)* | `Jones (2022)_studyBtwnPTSDIDformation.pdf` | PDF |
+| "Processing and Triggering Factors in Mental Health" | "Processing Study" | `Brown et al. (2024)_process~Study.pdf` | PDF |
 
 ## Compatibility
 
@@ -119,16 +140,22 @@ This enhanced version includes:
 
 ### Common Issues
 
-1. **"No items selected"**: Ensure you've selected items in the library, not attachments directly
-2. **Permission errors**: Check that Zotero has write permissions to your attachment directory
-3. **Invalid characters**: The plugin automatically removes invalid filename characters
+1. **"No items selected"**: Select the parent items in your library, not the PDF attachments directly
+2. **"Processed 0 items"**: Ensure selected items have PDF attachments
+3. **Permission errors**: Check that Zotero has write permissions to your attachment directory
 
-### Error Messages
+### Debug Information
 
-The plugin provides detailed error messages including:
-- Which items failed to process
-- Specific error reasons
-- Summary of successful vs failed operations
+Enable debug output to see detailed processing information:
+1. Go to **Help → Debug Output Logging**
+2. Enable "Real-time" output
+3. Run the rename function and check the output
+
+You should see messages like:
+- "Processing X items"
+- "Using Short Title: ..." or "Using Title: ..."
+- "Generated filename: Author (Year)_processedTitle.pdf"
+- "Successfully renamed attachment"
 
 ## Development
 
@@ -138,30 +165,35 @@ The plugin provides detailed error messages including:
 - `chrome/content/rename.js`: Core renaming logic and API
 
 ### Key Functions
-- `formatTitle()`: Processes and formats title text
-- `formatAuthors()`: Handles author name formatting
-- `generateFilename()`: Creates the complete filename
-- `rename()`: Main renaming function
+- `formatTitle()`: Processes titles with abbreviations and camelCase
+- `formatAuthors()`: Handles author name formatting (single vs multiple)
+- `extractYear()`: Extracts year from date fields
+- `generateFilename()`: Creates the processed filename
+- `rename()`: Main renaming function (also sets title field to "PDF")
 - `batchRename()`: Batch processing with progress tracking
+
+### Building
+```bash
+# Make executable (first time only)
+chmod +x build.sh
+
+# Build plugin
+./build.sh
+
+# Install for development (creates symlink)
+./build.sh dev
+```
 
 ## License
 
-This plugin is provided as-is for educational and research purposes. Feel free to modify and distribute according to your needs.
-
-## Contributing
-
-Contributions are welcome! Areas for improvement:
-- Additional text processing rules
-- More filename format options
-- Localisation support
-- Integration with other Zotero plugins
+MIT License - Feel free to modify and distribute according to your needs.
 
 ## Changelog
 
 ### Version 2.0.0
-- Complete rewrite with improved error handling
-- Fixed creator type identification bug
-- Added language-specific processing
-- Improved filename sanitisation
-- Added batch processing capabilities
-- Enhanced debugging and logging
+- Smart title processing with academic abbreviations
+- Sets attachment Title field to "PDF" for clean Zotero interface
+- Uses "et al." format for multiple authors
+- Comprehensive error handling and debugging
+- Enhanced batch processing capabilities
+- Fixed creator type identification for different Zotero setups
