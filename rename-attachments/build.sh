@@ -3,7 +3,7 @@
 # Build script for Rename Attachments Zotero Plugin
 
 PLUGIN_NAME="rename-attachments"
-VERSION="2.0.0"
+VERSION="2.0.1"
 
 echo "Building ${PLUGIN_NAME} v${VERSION}..."
 
@@ -18,32 +18,67 @@ if [ ! -f "bootstrap.js" ]; then
     exit 1
 fi
 
-if [ ! -f "chrome/content/rename.js" ]; then
-    echo "Error: chrome/content/rename.js not found. Make sure you're in the plugin directory."
-    exit 1
-fi
-
 # Clean previous build
 rm -rf build
 
 # Create build directory
 mkdir -p build/${PLUGIN_NAME}
 
-# Copy plugin files
+# Copy required files
 echo "Copying plugin files..."
 cp manifest.json build/${PLUGIN_NAME}/
 cp bootstrap.js build/${PLUGIN_NAME}/
 
+# Create chrome.manifest if it doesn't exist
+if [ ! -f "chrome.manifest" ]; then
+    echo "Creating chrome.manifest..."
+    cat > build/${PLUGIN_NAME}/chrome.manifest << 'EOF'
+content	rename-attachments	chrome/content/
+locale	rename-attachments	en-US	chrome/locale/en-US/
+EOF
+else
+    cp chrome.manifest build/${PLUGIN_NAME}/
+fi
+
 # Create chrome directory structure
 mkdir -p build/${PLUGIN_NAME}/chrome/content
-cp chrome/content/rename.js build/${PLUGIN_NAME}/chrome/content/
-
-# Verify files were copied
-echo "Verifying build structure..."
-if [ ! -f "build/${PLUGIN_NAME}/manifest.json" ]; then
-    echo "Error: Failed to copy manifest.json"
-    exit 1
+if [ -f "chrome/content/rename.js" ]; then
+    cp chrome/content/rename.js build/${PLUGIN_NAME}/chrome/content/
 fi
+
+# Create install.rdf for backwards compatibility (optional)
+cat > build/${PLUGIN_NAME}/install.rdf << EOF
+<?xml version="1.0"?>
+<RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+  <Description about="urn:mozilla:install-manifest">
+    <em:id>rename-attachments@zotero.org</em:id>
+    <em:name>Rename Attachments</em:name>
+    <em:version>${VERSION}</em:version>
+    <em:description>Rename PDF attachments based on metadata</em:description>
+    <em:creator>Ko Horiuchi</em:creator>
+    <em:type>2</em:type>
+    <em:bootstrap>true</em:bootstrap>
+    <em:unpack>false</em:unpack>
+    
+    <em:targetApplication>
+      <Description>
+        <em:id>zotero@chnm.gmu.edu</em:id>
+        <em:minVersion>7.0.0</em:minVersion>
+        <em:maxVersion>7.*</em:maxVersion>
+      </Description>
+    </em:targetApplication>
+  </Description>
+</RDF>
+EOF
+
+# Verify core files were copied
+echo "Verifying build structure..."
+for file in "manifest.json" "bootstrap.js" "chrome.manifest" "install.rdf"; do
+    if [ ! -f "build/${PLUGIN_NAME}/${file}" ]; then
+        echo "Warning: ${file} not found in build"
+    fi
+done
 
 # Create XPI package
 echo "Creating XPI package..."
@@ -58,6 +93,16 @@ if [ ! -f "build/${PLUGIN_NAME}-${VERSION}.xpi" ]; then
 fi
 
 echo "Plugin packaged as build/${PLUGIN_NAME}-${VERSION}.xpi"
+
+# Test XPI validity (if unzip is available)
+if command -v unzip &> /dev/null; then
+    echo "Testing XPI file integrity..."
+    if unzip -t "build/${PLUGIN_NAME}-${VERSION}.xpi" > /dev/null 2>&1; then
+        echo "✓ XPI file appears to be valid"
+    else
+        echo "⚠ Warning: XPI file may be corrupted"
+    fi
+fi
 
 # Optional: Create development symlink for testing
 if [ "$1" = "dev" ]; then
@@ -106,6 +151,15 @@ fi
 
 echo ""
 echo "Build completed successfully!"
+echo ""
+echo "File structure should be:"
+echo "├── manifest.json"
+echo "├── bootstrap.js"
+echo "├── chrome.manifest"
+echo "├── install.rdf"
+echo "└── chrome/"
+echo "    └── content/"
+echo "        └── rename.js"
 echo ""
 echo "To install manually:"
 echo "1. Open Zotero"
