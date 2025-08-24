@@ -20,7 +20,7 @@ A Zotero plugin that renames PDF attachments with smart title processing while s
    ```
    rename-attachments/
    ├── manifest.json
-   ├── bootstrap.js
+   └── bootstrap.js
    ```
 3. Package as a `.xpi` file or install directly in Zotero 7's developer mode
    ```
