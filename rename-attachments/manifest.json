@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "Rename Attachments",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "Rename PDF attachments based on metadata",
 	"author": "Ko Horiuchi",
 	"applications": {

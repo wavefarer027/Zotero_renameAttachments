@@ -22,7 +22,10 @@ Zotero.RenameAttachments.config = {
         'post-traumatic stress disorder': 'PTSD',
         'united states': 'US',
         'identities': 'ID',
-        'identity': 'ID'
+        'identity': 'ID',
+        'anorexia nervosa': 'AN',
+        'bulimia nervosa': 'BN',
+        'eating disorder': 'ED'
     },
     
     // Special patterns (applied before word splitting)
