@@ -187,7 +187,7 @@ MIT License - Feel free to modify and distribute according to your needs.
 
 ## Changelog
 
-### Version 2.0.3
+### Version 2.0.1
 - Updated file structure for compatibility with Zotero 7
    - Add `update_url`
 
