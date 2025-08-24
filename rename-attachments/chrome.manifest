@@ -1,5 +1,0 @@
-content	rename-attachments	chrome/content/
-locale	rename-attachments	en-US	chrome/locale/en-US/
-
-# Register the overlay (if needed)
-# overlay	chrome://zotero/content/zoteroPane.xul	chrome://rename-attachments/content/overlay.xul
