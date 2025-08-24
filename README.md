@@ -21,13 +21,10 @@ A Zotero plugin that renames PDF attachments with smart title processing while s
    rename-attachments/
    ├── manifest.json
    ├── bootstrap.js
-   └── chrome/
-       └── content/
-           └── rename.js
    ```
 3. Package as a `.xpi` file or install directly in Zotero 7's developer mode
    ```
-   zip -r ../rename-attachments-2.0.0.xpi *
+   zip -r ../rename-attachments.xpi *
    ```
 
 ## Usage
@@ -100,6 +97,7 @@ This gives you:
 - "posttraumatic stress disorder" → "PTSD"
 - "united states" → "US"
 - "identity/identities" → "ID"
+- "eating disorder" → "ED"
 - Words ending in "-ing" → "~" (e.g., "triggering" → "trigger~")
 
 ### Text Processing
@@ -162,7 +160,6 @@ You should see messages like:
 ### File Structure
 - `manifest.json`: Extension metadata and compatibility info
 - `bootstrap.js`: Main plugin lifecycle and UI integration
-- `chrome/content/rename.js`: Core renaming logic and API
 
 ### Key Functions
 - `formatTitle()`: Processes titles with abbreviations and camelCase
@@ -189,6 +186,10 @@ chmod +x build.sh
 MIT License - Feel free to modify and distribute according to your needs.
 
 ## Changelog
+
+### Version 2.0.3
+- Updated file structure for compatibility with Zotero 7
+   - Add `update_url`
 
 ### Version 2.0.0
 - Smart title processing with academic abbreviations
