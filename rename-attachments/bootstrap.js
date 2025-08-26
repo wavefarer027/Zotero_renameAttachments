@@ -133,7 +133,11 @@ const config = {
         'identity': 'ID',
         'anorexia nervosa': 'AN',
         'bulimia nervosa': 'BN',
-        'eating disorder': 'ED'
+        'eating disorder': 'ED',
+        'treatment': 'Tx',
+        'diagnosis' : 'Dx',
+        'history': 'Hx',
+        'patient': 'Pt'
     },
     
     // Special patterns (applied before word splitting)
